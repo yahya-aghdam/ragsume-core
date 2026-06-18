@@ -1,15 +1,39 @@
 name: "Yahya Parvin Aghdam"
 headline: "Software AI Engineer - RAG - LLM"
 summary: >
-  Backend engineer with 4+ years building distributed systems, APIs, and
-  data pipelines. Focused on Go, cloud-native architecture, and pragmatic
+  Backend engineer with 5+ years building distributed systems, APIs, and
+  data pipelines. Focused on Go and pragmatic
   tradeoffs that ship reliable software.
 skills:
   - go
   - python
-  - postgres
-  - kubernetes
-  - aws
+  - typescript
+  - javascript
+  - nestjs
+  - nextjs
+  - docker
+  - LLM
+  - AI
+  - qdrant
+  - Agent
+  - AI-agent
+  - RAG
+  - Ollama
+  - Qdrant
+licenses:
+  - Orchestrate Multi-agent Workflows with Gemini Enterprise , Google
+  - Agents and Workflows, OpenAI
+  - AI Fluency for Small Businesses, Anthropic
+  - Advanced Topics, Anthropic
+  - Introduction to Model Context Protocol, Anthropic
+  - Claude 101, Anthropic
+  - Optimize Agent Behavior, Google
+  - Prompt Design in Vertex AI Skill Badge, Google
+  - Team Essentials for Designing AI Solutions, IBM
+  - Retrieval-Augmented Generation for Enhanced AI Outputs, IBM
+  - Make Agentic AI Work for You, IBM
+  - Getting Started with Generative AI, IBM
 contact:
   email: "yahyaaghdam.ir@gmail.com"
   linkedin: "https://linkedin.com/in/yahya-aghdam"
+  phone: +989120068216

@@ -1,0 +1,34 @@
+project_name: "RAGsume core"
+category: backend
+tech_stack:
+  - go
+  - net/http
+  - chi
+  - openai embeddings
+  - qdrant
+  - viper
+  - zap
+  - testify
+  - docker
+  - LLM
+  - AI
+  - qdrant
+  - Agent
+  
+problem: >
+  The project needed a flexible, context‑aware chat system that could retrieve
+  up‑to‑date information from project documentation and respond based on that
+  knowledge, while being easy to deploy and configure.
+decisions: >
+  Implemented core agent logic with embedding helpers and tool integrations,
+  using OpenAI embeddings and a Qdrant vector store for retrieval‑augmented
+  generation. Configuration is driven by environment variables and YAML via
+  Viper, and the service is exposed through a net/http server with chi routing.
+tradeoffs: >
+  Relying on external embedding and vector‑store services introduces latency
+  and dependency risks, and the generic tool system adds complexity to
+  maintenance.
+outcome: >
+  Delivered a Docker‑ready backend that supports multi‑project ingestion,
+  context‑aware conversations, and extensible tooling, ready for production
+  deployment.

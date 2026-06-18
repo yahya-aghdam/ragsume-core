@@ -1,0 +1,27 @@
+project_name: "gAuthCraft"
+category: backend
+tech_stack:
+  - node
+  - typescript
+  - jest
+  - docker
+  - protobuf
+  - grpc-js
+  - nestjs
+problem: >
+  A need existed for a lightweight authentication service that could be
+  developed, tested, and deployed efficiently using modern TypeScript
+  tooling and containerisation.
+decisions: >
+  The project was built with Node.js and TypeScript, using npm scripts for
+  development, testing, and building. Docker compose was added for local
+  development and production builds, and Protocol Buffers with gRPC‑JS were
+  employed for the auth API definition.
+tradeoffs: >
+  Relying on npm scripts kept the setup simple but limited the ability to
+  parallelise complex CI pipelines. Docker was used only for local workflows,
+  so production containerisation may need further refinement.
+outcome: >
+  The repository provides a ready‑to‑run authentication service with
+  hot‑reloading development, unit tests via Jest, and a reproducible Docker
+  development environment.

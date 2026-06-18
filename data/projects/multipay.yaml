@@ -1,0 +1,27 @@
+project_name: "Multipay Service"
+category: backend
+date_range: "2023-2024"
+tech_stack:
+  - go
+  - grpc
+  - sqlite
+  - graphQL
+  - nestjs
+  - crypto
+  - cryption
+problem: >
+  The system needed to accept cryptocurrency payments across multiple chains,
+  provide a unified API for creating and verifying payments, and return the
+  necessary on‑chain details such as address and expiration timestamps.
+decisions: >
+  Implemented a gRPC API exposing AddPayment and VerifyPayment methods,
+  using a simple string‑based coin enumeration to support various tokens.
+  Chose Go for its performance and concurrency handling, and stored payment
+  records in SQLite for lightweight persistence.
+tradeoffs: >
+  Limited to a fixed set of supported coins, and SQLite may not scale for
+  high‑volume production workloads compared to a full database cluster.
+outcome: >
+  Delivered a functional payment service capable of creating payment requests
+  and returning structured responses, ready for integration with client
+  applications via gRPC.

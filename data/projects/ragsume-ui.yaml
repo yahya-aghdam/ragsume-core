@@ -1,0 +1,15 @@
+project_name: "RAGsume ui"
+category: frontend
+tech_stack:
+  - nextjs
+  - typescript
+  - react
+  - tailwind
+problem: > 
+  Users needed a quick way to compare a job description with a resume and obtain a relevance score. The existing workflow required manual evaluation, which was time‑consuming and error‑prone.
+decisions: > 
+  Implemented a reusable React component (JDMatcher) in the Next.js app router, using TypeScript for type safety. Integrated Tailwind CSS for consistent styling and placed the component under the matcher directory for clear modularity.
+tradeoffs: > 
+  Focused on a client‑side match UI, deferring complex similarity algorithms to a backend service, which adds latency for score retrieval.
+outcome: > 
+  Delivered an interactive UI where users can paste text and instantly see a similarity score, improving the speed of candidate assessment and enhancing the overall user experience.

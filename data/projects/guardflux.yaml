@@ -1,0 +1,28 @@
+project_name: "Guardflux"
+category: backend
+date_range: "2023-2024"
+tech_stack:
+  - joi
+  - nodejs
+  - nestjs
+  - mikroorm
+  - redis
+  - mySql
+  - mongo
+problem: >-
+  A lightweight library was required to validate incoming API requests and
+  enforce rate‑limiting while keeping the Node.js service responsive and easy to
+  integrate.
+decisions: >-
+  Built a thin wrapper around Joi for schema validation of query and body
+  parameters, and added a `rateLimit()` helper to control request frequency per
+  API key or IP address. The library is published as a plain Node.js module with
+  no external runtime dependencies.
+tradeoffs: >-
+  The solution focuses on simplicity and minimalism, so it does not include
+  advanced features such as distributed rate‑limit storage or automatic schema
+  generation.
+outcome: >-
+  The Guardflux package is released under the MIT license, version 3.0.0, and can
+  be installed via npm to provide quick input validation and basic rate‑limit
+  protection for Node.js APIs.
