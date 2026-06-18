@@ -1,0 +1,15 @@
+name: "Yahya Parvin Aghdam"
+headline: "Software AI Engineer - RAG - LLM"
+summary: >
+  Backend engineer with 4+ years building distributed systems, APIs, and
+  data pipelines. Focused on Go, cloud-native architecture, and pragmatic
+  tradeoffs that ship reliable software.
+skills:
+  - go
+  - python
+  - postgres
+  - kubernetes
+  - aws
+contact:
+  email: "yahyaaghdam.ir@gmail.com"
+  linkedin: "https://linkedin.com/in/yahya-aghdam"
