@@ -10,8 +10,11 @@ import (
 	"time"
 
 	"ragsume-core/agentkit"
+	"ragsume-core/cmd/server/middleware"
 	"ragsume-core/config"
 	"ragsume-core/logger"
+
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -54,7 +57,28 @@ func main() {
 	tools := agentkit.NewToolExecutor(qdrantClient, embedder, llm, config.DefaultCollectionName)
 	agent := agentkit.NewAgent(llm, *tools, BuildSystemPrompt(profileYAML))
 
-	router := newRouter(agent)
+	redisOpts, err := redis.ParseURL(config.C.RedisURL)
+	if err != nil {
+		logger.Fatal("parse redis url", "error", err)
+	}
+	redisClient := redis.NewClient(redisOpts)
+	defer func() { _ = redisClient.Close() }()
+
+	redisCtx, redisCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	if err := redisClient.Ping(redisCtx).Err(); err != nil {
+		redisCancel()
+		logger.Fatal("connect redis", "error", err)
+	}
+	redisCancel()
+	logger.Info("connected to redis", "url", config.C.RedisURL)
+
+	rateLimiter := middleware.NewRateLimiter(
+		redisClient,
+		config.C.RateLimitMax,
+		time.Duration(config.C.RateLimitWindow)*time.Second,
+	)
+
+	router := newRouter(agent, rateLimiter)
 	addr := fmt.Sprintf(":%d", config.C.Port)
 	server := &http.Server{
 		Addr:         addr,
@@ -76,9 +100,9 @@ func main() {
 	<-sigCh
 
 	logger.Info("shutting down")
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
-	defer cancel()
-	if err := server.Shutdown(ctx); err != nil {
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer shutdownCancel()
+	if err := server.Shutdown(shutdownCtx); err != nil {
 		logger.Error("shutdown error", "error", err)
 	}
 }

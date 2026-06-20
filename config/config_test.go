@@ -18,6 +18,7 @@ func setRequiredEnv(t *testing.T) {
 	t.Setenv("OPENROUTER_API_KEY", "test-openrouter-key")
 	t.Setenv("OLLAMA_URL", "http://localhost:11434")
 	t.Setenv("ALLOWED_ORIGIN", "http://localhost:3000")
+	t.Setenv("REDIS_URL", "redis://localhost:6379/0")
 }
 
 func TestLoad(t *testing.T) {
@@ -40,6 +41,9 @@ func TestLoad(t *testing.T) {
 			OpenRouterAPIKey: "test-openrouter-key",
 			OllamaURL:        "http://localhost:11434",
 			AllowedOrigin:    "http://localhost:3000",
+			RedisURL:         "redis://localhost:6379/0",
+			RateLimitMax:     60,
+			RateLimitWindow:  60,
 		}
 		if C != want {
 			t.Fatalf("got %+v, want %+v", C, want)
@@ -52,7 +56,8 @@ func TestLoad(t *testing.T) {
 		content := "APP_NAME=from-dotenv\nPORT=9090\nDEBUG=true\nRATE=0.75\n" +
 			"QDRANT_URL=http://qdrant:6333\nQDRANT_API_KEY=dotenv-key\n" +
 			"OPENROUTER_API_KEY=dotenv-or-key\nOLLAMA_URL=http://ollama:11434\n" +
-			"ALLOWED_ORIGIN=https://app.example.com\n"
+			"ALLOWED_ORIGIN=https://app.example.com\n" +
+			"REDIS_URL=redis://redis:6379/0\n"
 		if err := os.WriteFile(envFile, []byte(content), 0o600); err != nil {
 			t.Fatalf("write .env: %v", err)
 		}
@@ -69,7 +74,7 @@ func TestLoad(t *testing.T) {
 		for _, key := range []string{
 			"APP_NAME", "PORT", "DEBUG", "RATE",
 			"QDRANT_URL", "QDRANT_API_KEY", "OPENROUTER_API_KEY",
-			"OLLAMA_URL", "ALLOWED_ORIGIN",
+			"OLLAMA_URL", "ALLOWED_ORIGIN", "REDIS_URL",
 		} {
 			unsetEnv(t, key)
 		}
@@ -90,6 +95,9 @@ func TestLoad(t *testing.T) {
 			OpenRouterAPIKey: "dotenv-or-key",
 			OllamaURL:        "http://ollama:11434",
 			AllowedOrigin:    "https://app.example.com",
+			RedisURL:         "redis://redis:6379/0",
+			RateLimitMax:     60,
+			RateLimitWindow:  60,
 		}
 		if C != want {
 			t.Fatalf("got %+v, want %+v", C, want)

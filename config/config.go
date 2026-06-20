@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/joho/godotenv"
 )
@@ -23,6 +24,9 @@ type Config struct {
 	OpenRouterAPIKey string
 	OllamaURL        string
 	AllowedOrigin    string
+	RedisURL         string
+	RateLimitMax     int
+	RateLimitWindow  int
 }
 
 // C is the global configuration instance.
@@ -101,6 +105,33 @@ func Load() error {
 		return err
 	}
 
+	redisURL, err := getString("REDIS_URL")
+	if err != nil {
+		return err
+	}
+
+	rateLimitMax := 60
+	if value, ok := getOptionalString("RATE_LIMIT_MAX"); ok {
+		rateLimitMax, err = strconv.Atoi(value)
+		if err != nil {
+			return fmt.Errorf("environment variable %q must be an integer, got %q", "RATE_LIMIT_MAX", value)
+		}
+		if rateLimitMax < 1 {
+			return fmt.Errorf("environment variable %q must be at least 1, got %d", "RATE_LIMIT_MAX", rateLimitMax)
+		}
+	}
+
+	rateLimitWindow := 60
+	if value, ok := getOptionalString("RATE_LIMIT_WINDOW"); ok {
+		rateLimitWindow, err = strconv.Atoi(value)
+		if err != nil {
+			return fmt.Errorf("environment variable %q must be an integer, got %q", "RATE_LIMIT_WINDOW", value)
+		}
+		if rateLimitWindow < 1 {
+			return fmt.Errorf("environment variable %q must be at least 1, got %d", "RATE_LIMIT_WINDOW", rateLimitWindow)
+		}
+	}
+
 	C = Config{
 		AppName:          appName,
 		Port:             port,
@@ -114,6 +145,9 @@ func Load() error {
 		OpenRouterAPIKey: openRouterAPIKey,
 		OllamaURL:        ollamaURL,
 		AllowedOrigin:    allowedOrigin,
+		RedisURL:         redisURL,
+		RateLimitMax:     rateLimitMax,
+		RateLimitWindow:  rateLimitWindow,
 	}
 
 	return nil

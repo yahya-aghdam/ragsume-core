@@ -77,10 +77,10 @@ func (c *QdrantClient) do(ctx context.Context, method, path string, body any) (m
 	}
 
 	start := time.Now()
-	log.DebugContext(ctx, "qdrant request",
+	log.InfoContext(ctx, "qdrant request",
 		"method", method,
 		"path", path,
-		"body", string(encoded),
+		"body", sanitizeQdrantRequestBody(body, encoded),
 	)
 
 	resp, err := c.httpClient.Do(req)
@@ -123,7 +123,7 @@ func (c *QdrantClient) do(ctx context.Context, method, path string, body any) (m
 		return nil, fmt.Errorf("qdrant %s %s returned status %d: %s", method, path, resp.StatusCode, snippet)
 	}
 
-	log.DebugContext(ctx, "qdrant response",
+	log.InfoContext(ctx, "qdrant response",
 		"method", method,
 		"path", path,
 		"status", resp.StatusCode,
@@ -148,6 +148,80 @@ func truncateLogBody(raw []byte) string {
 		return string(raw)
 	}
 	return string(raw[:max]) + "...(truncated)"
+}
+
+// sanitizeQdrantRequestBody replaces large vector payloads with a short summary
+// so request logs stay readable.
+func sanitizeQdrantRequestBody(body any, encoded []byte) string {
+	if body == nil {
+		return ""
+	}
+	m, ok := body.(map[string]any)
+	if !ok {
+		return truncateLogBody(encoded)
+	}
+
+	sanitized := make(map[string]any, len(m))
+	for k, v := range m {
+		sanitized[k] = sanitizeQdrantValue(k, v)
+	}
+
+	out, err := json.Marshal(sanitized)
+	if err != nil {
+		return truncateLogBody(encoded)
+	}
+	return truncateLogBody(out)
+}
+
+func sanitizeQdrantValue(key string, value any) any {
+	switch key {
+	case "query", "vector":
+		return vectorSummary(value)
+	case "points":
+		points, ok := value.([]map[string]any)
+		if !ok {
+			if raw, ok := value.([]any); ok {
+				out := make([]map[string]any, 0, len(raw))
+				for _, item := range raw {
+					if m, ok := item.(map[string]any); ok {
+						out = append(out, m)
+					}
+				}
+				points = out
+			}
+		}
+		if points == nil {
+			return value
+		}
+		sanitized := make([]map[string]any, 0, len(points))
+		for _, p := range points {
+			cp := make(map[string]any, len(p))
+			for k, v := range p {
+				if k == "vector" {
+					cp[k] = vectorSummary(v)
+				} else {
+					cp[k] = v
+				}
+			}
+			sanitized = append(sanitized, cp)
+		}
+		return sanitized
+	default:
+		return value
+	}
+}
+
+func vectorSummary(value any) string {
+	switch v := value.(type) {
+	case []float32:
+		return fmt.Sprintf("[vector:%d dims]", len(v))
+	case []float64:
+		return fmt.Sprintf("[vector:%d dims]", len(v))
+	case []any:
+		return fmt.Sprintf("[vector:%d dims]", len(v))
+	default:
+		return fmt.Sprintf("[vector:%T]", value)
+	}
 }
 
 // EnsureCollection creates the collection if it does not already exist.
