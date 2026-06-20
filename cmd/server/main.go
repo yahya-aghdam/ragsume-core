@@ -46,6 +46,8 @@ func main() {
 		logger.Fatal("connect qdrant", "error", err)
 	}
 	defer func() { _ = qdrantClient.Close() }()
+	// Log successful connection to Qdrant
+	logger.Info("connected to qdrant", "url", config.C.QdrantURL)
 
 	embedder := agentkit.NewOllamaEmbedder(config.C.OllamaURL, config.DefaultEmbedModel)
 	llm := agentkit.NewOpenRouterClient(config.C.OpenRouterAPIKey, config.DefaultLLMModel)
