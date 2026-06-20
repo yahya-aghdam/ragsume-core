@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"ragsume-core/logger"
 	"strings"
 	"time"
 )
@@ -51,9 +52,13 @@ func (c *QdrantClient) Close() error {
 // do performs an HTTP request against the Qdrant REST API, attaching the API
 // key header when configured, and returns the decoded JSON body.
 func (c *QdrantClient) do(ctx context.Context, method, path string, body any) (map[string]any, error) {
+	log := logger.Component("qdrant")
+
 	var reqBody io.Reader
+	var encoded []byte
 	if body != nil {
-		encoded, err := json.Marshal(body)
+		var err error
+		encoded, err = json.Marshal(body)
 		if err != nil {
 			return nil, fmt.Errorf("marshal request body: %w", err)
 		}
@@ -71,14 +76,34 @@ func (c *QdrantClient) do(ctx context.Context, method, path string, body any) (m
 		req.Header.Set("api-key", c.apiKey)
 	}
 
+	start := time.Now()
+	log.DebugContext(ctx, "qdrant request",
+		"method", method,
+		"path", path,
+		"body", string(encoded),
+	)
+
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
+		log.ErrorContext(ctx, "qdrant request failed",
+			"method", method,
+			"path", path,
+			"elapsed_ms", time.Since(start).Milliseconds(),
+			"error", err,
+		)
 		return nil, fmt.Errorf("qdrant request %s %s: %w", method, path, err)
 	}
 	defer resp.Body.Close()
 
 	raw, err := io.ReadAll(resp.Body)
 	if err != nil {
+		log.ErrorContext(ctx, "qdrant read response failed",
+			"method", method,
+			"path", path,
+			"status", resp.StatusCode,
+			"elapsed_ms", time.Since(start).Milliseconds(),
+			"error", err,
+		)
 		return nil, fmt.Errorf("read qdrant response: %w", err)
 	}
 
@@ -88,8 +113,23 @@ func (c *QdrantClient) do(ctx context.Context, method, path string, body any) (m
 		if len(snippet) > 512 {
 			snippet = snippet[:512]
 		}
+		log.WarnContext(ctx, "qdrant non-2xx response",
+			"method", method,
+			"path", path,
+			"status", resp.StatusCode,
+			"elapsed_ms", time.Since(start).Milliseconds(),
+			"body", snippet,
+		)
 		return nil, fmt.Errorf("qdrant %s %s returned status %d: %s", method, path, resp.StatusCode, snippet)
 	}
+
+	log.DebugContext(ctx, "qdrant response",
+		"method", method,
+		"path", path,
+		"status", resp.StatusCode,
+		"elapsed_ms", time.Since(start).Milliseconds(),
+		"body", truncateLogBody(raw),
+	)
 
 	var parsed map[string]any
 	if len(raw) == 0 {
@@ -99,6 +139,15 @@ func (c *QdrantClient) do(ctx context.Context, method, path string, body any) (m
 		return nil, fmt.Errorf("decode qdrant response: %w", err)
 	}
 	return parsed, nil
+}
+
+// truncateLogBody limits the size of response bodies written to logs.
+func truncateLogBody(raw []byte) string {
+	const max = 4096
+	if len(raw) <= max {
+		return string(raw)
+	}
+	return string(raw[:max]) + "...(truncated)"
 }
 
 // EnsureCollection creates the collection if it does not already exist.
