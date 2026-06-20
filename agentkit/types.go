@@ -3,9 +3,7 @@ package agentkit
 import (
 	"fmt"
 	"net/url"
-	"strconv"
-
-	qdrant "github.com/qdrant/go-client/qdrant"
+	"strings"
 )
 
 // Condition mirrors a single Qdrant filter condition.
@@ -37,52 +35,86 @@ type PointInput struct {
 	Payload map[string]any
 }
 
-func (f *Filter) ToQdrant() *qdrant.Filter {
+// ToQdrantFilter builds the REST API filter JSON for Qdrant.
+// Returns nil when the filter is empty so the field can be omitted.
+func (f *Filter) ToQdrantFilter() map[string]any {
 	if f == nil || len(f.Must) == 0 {
 		return nil
 	}
 
-	conditions := make([]*qdrant.Condition, 0, len(f.Must))
+	conditions := make([]map[string]any, 0, len(f.Must))
 	for _, c := range f.Must {
-		conditions = append(conditions, qdrant.NewMatchKeyword(c.Field, c.Match))
+		conditions = append(conditions, map[string]any{
+			"key":   c.Field,
+			"match": map[string]any{"value": c.Match},
+		})
 	}
 
-	return &qdrant.Filter{Must: conditions}
+	return map[string]any{"must": conditions}
 }
 
-func chunkFromPayload(payload map[string]*qdrant.Value, score *float32) Chunk {
+// chunkFromPayload converts a REST payload (map[string]any) into a Chunk.
+func chunkFromPayload(payload map[string]any, score *float32) Chunk {
 	chunk := Chunk{Score: score}
 	if payload == nil {
 		return chunk
 	}
 
 	if v, ok := payload["project_name"]; ok {
-		chunk.ProjectName = valueAsString(v)
+		chunk.ProjectName = anyAsString(v)
 	}
 	if v, ok := payload["section"]; ok {
-		chunk.Section = valueAsString(v)
+		chunk.Section = anyAsString(v)
 	}
 	if v, ok := payload["chunk_text"]; ok {
-		chunk.ChunkText = valueAsString(v)
+		chunk.ChunkText = anyAsString(v)
 	}
 	if v, ok := payload["category"]; ok {
-		chunk.Category = valueAsString(v)
+		chunk.Category = anyAsString(v)
 	}
 	if v, ok := payload["date_range"]; ok {
-		chunk.DateRange = valueAsString(v)
+		chunk.DateRange = anyAsString(v)
 	}
 	if v, ok := payload["tech_stack"]; ok {
-		chunk.TechStack = valueAsStringList(v)
+		chunk.TechStack = anyAsStringList(v)
 	}
 
 	return chunk
 }
 
-func valueAsString(v *qdrant.Value) string {
+func anyAsString(v any) string {
 	if v == nil {
 		return ""
 	}
-	return v.GetStringValue()
+	switch val := v.(type) {
+	case string:
+		return val
+	case fmt.Stringer:
+		return val.String()
+	default:
+		return fmt.Sprintf("%v", v)
+	}
+}
+
+func anyAsStringList(v any) []string {
+	if v == nil {
+		return nil
+	}
+	list, ok := v.([]any)
+	if !ok {
+		// Some payloads may arrive as []string directly.
+		if slist, ok := v.([]string); ok {
+			return slist
+		}
+		return nil
+	}
+	out := make([]string, 0, len(list))
+	for _, item := range list {
+		if s := anyAsString(item); s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 func normalizePayload(payload map[string]any) map[string]any {
@@ -109,45 +141,41 @@ func normalizePayloadValue(value any) any {
 	}
 }
 
-func valueAsStringList(v *qdrant.Value) []string {
-	if v == nil {
-		return nil
+// ParseQdrantURL parses a QDRANT_URL into a base URL suitable for REST calls.
+// It normalizes the scheme/host/port and returns a base URL with no trailing slash.
+// When no port is supplied, it defaults to 6333 (the Qdrant REST port).
+func ParseQdrantURL(raw string) (baseURL string, err error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", fmt.Errorf("qdrant url is empty")
 	}
-	list := v.GetListValue()
-	if list == nil {
-		return nil
-	}
-	out := make([]string, 0, len(list.GetValues()))
-	for _, item := range list.GetValues() {
-		if s := item.GetStringValue(); s != "" {
-			out = append(out, s)
-		}
-	}
-	return out
-}
 
-// ParseQdrantURL parses a QDRANT_URL into host, port, and TLS flag.
-func ParseQdrantURL(raw string) (host string, port int, useTLS bool, err error) {
 	u, err := url.Parse(raw)
 	if err != nil {
-		return "", 0, false, fmt.Errorf("parse qdrant url: %w", err)
+		return "", fmt.Errorf("parse qdrant url: %w", err)
 	}
 
-	host = u.Hostname()
+	host := u.Hostname()
 	if host == "" {
 		host = u.Path
 	}
-
-	port = 6334
-	if p := u.Port(); p != "" {
-		port, err = strconv.Atoi(p)
-		if err != nil {
-			return "", 0, false, fmt.Errorf("parse qdrant port: %w", err)
-		}
-	} else if u.Scheme == "https" {
-		port = 6334
+	if host == "" {
+		return "", fmt.Errorf("qdrant url has no host: %q", raw)
 	}
 
-	useTLS = u.Scheme == "https"
-	return host, port, useTLS, nil
+	port := u.Port()
+	if port == "" {
+		if u.Scheme == "https" {
+			port = "443"
+		} else {
+			port = "6333"
+		}
+	}
+
+	scheme := u.Scheme
+	if scheme == "" {
+		scheme = "http"
+	}
+
+	return fmt.Sprintf("%s://%s:%s", scheme, host, port), nil
 }

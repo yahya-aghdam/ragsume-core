@@ -76,7 +76,7 @@ func main() {
 	<-sigCh
 
 	logger.Info("shutting down")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 	if err := server.Shutdown(ctx); err != nil {
 		logger.Error("shutdown error", "error", err)

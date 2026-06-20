@@ -13,7 +13,7 @@ func setRequiredEnv(t *testing.T) {
 	t.Setenv("PORT", "3000")
 	t.Setenv("DEBUG", "false")
 	t.Setenv("RATE", "2.5")
-	t.Setenv("QDRANT_URL", "http://localhost:6334")
+	t.Setenv("QDRANT_URL", "http://localhost:6333")
 	t.Setenv("QDRANT_API_KEY", "test-qdrant-key")
 	t.Setenv("OPENROUTER_API_KEY", "test-openrouter-key")
 	t.Setenv("OLLAMA_URL", "http://localhost:11434")
@@ -35,7 +35,7 @@ func TestLoad(t *testing.T) {
 			Rate:             2.5,
 			LogLevel:         "info",
 			LogFormat:        "text",
-			QdrantURL:        "http://localhost:6334",
+			QdrantURL:        "http://localhost:6333",
 			QdrantAPIKey:     "test-qdrant-key",
 			OpenRouterAPIKey: "test-openrouter-key",
 			OllamaURL:        "http://localhost:11434",
@@ -50,7 +50,7 @@ func TestLoad(t *testing.T) {
 		dir := t.TempDir()
 		envFile := filepath.Join(dir, ".env")
 		content := "APP_NAME=from-dotenv\nPORT=9090\nDEBUG=true\nRATE=0.75\n" +
-			"QDRANT_URL=http://qdrant:6334\nQDRANT_API_KEY=dotenv-key\n" +
+			"QDRANT_URL=http://qdrant:6333\nQDRANT_API_KEY=dotenv-key\n" +
 			"OPENROUTER_API_KEY=dotenv-or-key\nOLLAMA_URL=http://ollama:11434\n" +
 			"ALLOWED_ORIGIN=https://app.example.com\n"
 		if err := os.WriteFile(envFile, []byte(content), 0o600); err != nil {
@@ -85,7 +85,7 @@ func TestLoad(t *testing.T) {
 			Rate:             0.75,
 			LogLevel:         "debug",
 			LogFormat:        "text",
-			QdrantURL:        "http://qdrant:6334",
+			QdrantURL:        "http://qdrant:6333",
 			QdrantAPIKey:     "dotenv-key",
 			OpenRouterAPIKey: "dotenv-or-key",
 			OllamaURL:        "http://ollama:11434",
