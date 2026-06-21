@@ -48,7 +48,7 @@ func main() {
 	if err := qdrantClient.EnsureCollection(ctx, *collection, config.DefaultVectorSize); err != nil {
 		logger.Fatal("ensure collection", "error", err)
 	}
-	if err := qdrantClient.EnsurePayloadIndexes(ctx, *collection, []string{"tech_stack", "category"}); err != nil {
+	if err := qdrantClient.EnsurePayloadIndexes(ctx, *collection, []string{"tech_stack", "category", "section", "project_name"}); err != nil {
 		logger.Fatal("ensure payload indexes", "error", err)
 	}
 

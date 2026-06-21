@@ -16,6 +16,27 @@ const (
 	defaultMatchLimit       = 8
 )
 
+// filterableFields are the payload fields that are indexed in Qdrant and can
+// be used as keyword filters by the search_profile tool. Keep this in sync
+// with the indexes created in ingest/main.go.
+var filterableFields = []string{
+	"category",
+	"tech_stack",
+	"section",
+	"project_name",
+}
+
+// isFilterableField reports whether the given field name is a valid payload
+// field that can be used in a search_profile filter.
+func isFilterableField(field string) bool {
+	for _, f := range filterableFields {
+		if f == field {
+			return true
+		}
+	}
+	return false
+}
+
 var defaultTools = []ToolDefinition{
 	{
 		Type: "function",
@@ -33,15 +54,22 @@ var defaultTools = []ToolDefinition{
 					},
 					"filter": map[string]any{
 						"type":        "object",
-						"description": "Optional Qdrant-style filter with must conditions.",
+						"description": "Optional Qdrant-style filter with must conditions. Only the indexed payload fields may be used as 'field'.",
 						"properties": map[string]any{
 							"must": map[string]any{
 								"type": "array",
 								"items": map[string]any{
 									"type": "object",
 									"properties": map[string]any{
-										"field": map[string]any{"type": "string"},
-										"match": map[string]any{"type": "string"},
+										"field": map[string]any{
+											"type":        "string",
+											"enum":        filterableFields,
+											"description": "Payload field to filter on. Must be one of the indexed fields: category, tech_stack, section, project_name. Never use fields like 'skills' — they do not exist in the store.",
+										},
+										"match": map[string]any{
+											"type":        "string",
+											"description": "Lowercase normalized value to match exactly (e.g. \"backend\", \"go\", \"decisions\").",
+										},
 									},
 									"required": []string{"field", "match"},
 								},
@@ -132,6 +160,20 @@ func (e *ToolExecutor) searchProfile(ctx context.Context, arguments string) (str
 	hasFilter := args.Filter != nil && len(args.Filter.Must) > 0
 	if query == "" && !hasFilter {
 		return "", fmt.Errorf("search_profile requires a query, a filter, or both")
+	}
+
+	// Reject filters that reference payload fields we never index/store. The
+	// LLM sometimes invents fields like "skills"; surface a clear error so it
+	// can retry with a valid field or fall back to a semantic query.
+	if hasFilter {
+		for _, c := range args.Filter.Must {
+			if !isFilterableField(c.Field) {
+				return "", fmt.Errorf(
+					"search_profile filter field %q is not filterable; use one of %s or drop the filter and pass a semantic query instead",
+					c.Field, strings.Join(filterableFields, ", "),
+				)
+			}
+		}
 	}
 
 	var chunks []Chunk

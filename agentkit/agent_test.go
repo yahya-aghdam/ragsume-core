@@ -45,10 +45,10 @@ func (m *mockEmbedder) Embed(ctx context.Context, text string) ([]float32, error
 }
 
 type mockChatClient struct {
-	responses     []Message
-	calls         int
-	streamCalls   int
-	streamTokens  []string
+	responses    []Message
+	calls        int
+	streamCalls  int
+	streamTokens []string
 }
 
 func (m *mockChatClient) Complete(ctx context.Context, req ChatCompletionRequest) (Message, error) {
@@ -142,6 +142,41 @@ func TestSearchProfileQueryWithFilter(t *testing.T) {
 	}
 	if len(result.Chunks) != 1 {
 		t.Fatalf("unexpected chunks: %+v", result.Chunks)
+	}
+}
+
+func TestSearchProfileRejectsUnknownFilterField(t *testing.T) {
+	exec := NewToolExecutor(&mockVectorStore{}, &mockEmbedder{}, nil, "projects")
+	_, err := exec.Execute(context.Background(), toolSearchProfile, `{"query":"","filter":{"must":[{"field":"skills","match":"go"}]}}`)
+	if err == nil {
+		t.Fatal("expected error for non-filterable field 'skills'")
+	}
+	if !strings.Contains(err.Error(), "skills") || !strings.Contains(err.Error(), "filterable") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+}
+
+func TestSearchProfileAcceptsKnownFilterFields(t *testing.T) {
+	called := false
+	store := &mockVectorStore{
+		scrollFn: func(_ context.Context, _ string, filter *Filter, _ uint64) ([]Chunk, error) {
+			called = true
+			if filter == nil || len(filter.Must) != 1 || filter.Must[0].Field != "section" {
+				t.Fatalf("unexpected filter: %+v", filter)
+			}
+			return []Chunk{{ProjectName: "Alpha", Section: "decisions"}}, nil
+		},
+	}
+	exec := NewToolExecutor(store, &mockEmbedder{}, nil, "projects")
+	out, err := exec.Execute(context.Background(), toolSearchProfile, `{"query":"","filter":{"must":[{"field":"section","match":"decisions"}]}}`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called {
+		t.Fatal("expected scroll call")
+	}
+	if strings.TrimSpace(out) == "" {
+		t.Fatal("expected non-empty result")
 	}
 }
 
