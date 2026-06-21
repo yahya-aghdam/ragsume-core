@@ -11,9 +11,11 @@ import (
 const (
 	toolSearchProfile       = "search_profile"
 	toolMatchJobDescription = "match_job_description"
+	toolListProjects        = "list_projects"
 	defaultCollection       = "projects"
 	defaultQueryLimit       = 10
 	defaultMatchLimit       = 8
+	defaultListLimit        = 50
 )
 
 // filterableFields are the payload fields that are indexed in Qdrant and can
@@ -97,6 +99,19 @@ var defaultTools = []ToolDefinition{
 			},
 		},
 	},
+	{
+		Type: "function",
+		Function: FunctionDefinition{
+			Name: toolListProjects,
+			Description: "List all project names from the profile. Call this when the user asks about " +
+				"what projects you have worked on, how many projects, or wants a summary of all projects. " +
+				"No arguments needed.",
+			Parameters: map[string]any{
+				"type":       "object",
+				"properties": map[string]any{},
+			},
+		},
+	},
 }
 
 type searchProfileArgs struct {
@@ -145,6 +160,8 @@ func (e *ToolExecutor) Execute(ctx context.Context, name, arguments string) (str
 		return e.searchProfile(ctx, arguments)
 	case toolMatchJobDescription:
 		return e.matchJobDescription(ctx, arguments)
+	case toolListProjects:
+		return e.listProjects(ctx)
 	default:
 		return "", fmt.Errorf("unknown tool %q", name)
 	}
@@ -305,6 +322,29 @@ func (e *ToolExecutor) generatePitch(ctx context.Context, jdText string, matches
 		return "", fmt.Errorf("generate pitch: %w", err)
 	}
 	return strings.TrimSpace(msg.Content), nil
+}
+
+// listProjects returns all unique project names from the vector store.
+func (e *ToolExecutor) listProjects(ctx context.Context) (string, error) {
+	chunks, err := e.Store.Scroll(ctx, e.Collection, nil, defaultListLimit)
+	if err != nil {
+		return "", fmt.Errorf("list projects: %w", err)
+	}
+
+	seen := map[string]struct{}{}
+	names := make([]string, 0, len(chunks))
+	for _, c := range chunks {
+		if _, ok := seen[c.ProjectName]; !ok {
+			seen[c.ProjectName] = struct{}{}
+			names = append(names, c.ProjectName)
+		}
+	}
+
+	out, err := json.Marshal(map[string]any{"projects": names})
+	if err != nil {
+		return "", fmt.Errorf("marshal list_projects result: %w", err)
+	}
+	return string(out), nil
 }
 
 func DefaultTools() []ToolDefinition {
