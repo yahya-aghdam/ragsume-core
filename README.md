@@ -4,6 +4,9 @@
 > project history into an AI agent. Recruiters chat with the candidate's
 > representative; the agent grounds every answer in indexed project chunks and a
 > profile, never inventing experience.
+>
+> **LLM model**: `openai/gpt-oss-120b:free` (via OpenRouter)
+> **Embedding model**: `nomic-embed-text` (via Ollama, 768-dim)
 
 ---
 
@@ -13,7 +16,7 @@
 2. [What Problem It Solves](#2-what-problem-it-solves)
 3. [High-Level Architecture](#3-high-level-architecture)
 4. [Technology Stack](#4-technology-stack)
-5. [Repository Layout](#5-repository-layout)
+5. [Project Structure](#5-project-structure)
 6. [Configuration](#6-configuration)
 7. [The `agentkit` Package](#7-the-agentkit-package)
 8. [The `config` Package](#8-the-config-package)
@@ -67,38 +70,22 @@ A traditional resume is static. Ragsume Core makes it **conversational**:
 
 ## 3. High-Level Architecture
 
-```
-                ┌──────────────────────────────────────────────┐
-                │                   Client                      │
-                │   (browser / curl / ragsume-ui frontend)     │
-                └───────────────┬──────────────────────────────┘
-                                │  HTTP POST /chat (SSE)
-                                ▼
-                ┌──────────────────────────────────────────────┐
-                │            cmd/server (chi router)            │
-                │  middleware: RequestID, RealIP, Recoverer,    │
-                │              CORS, RequestLogger              │
-                │  routes: GET /health, POST /chat             │
-                └───────────────┬──────────────────────────────┘
-                                │
-                                ▼
-                ┌──────────────────────────────────────────────┐
-                │                 agentkit.Agent                │
-                │   tool-calling loop (max 5 iterations)       │
-                │   Run()  -> non-streaming                    │
-                │   RunStream() -> tool rounds then SSE stream  │
-                └───────┬───────────────────────┬──────────────┘
-                        │                       │
-            ┌───────────▼──────────┐  ┌─────────▼──────────────┐
-            │  OpenRouterClient    │  │   ToolExecutor          │
-            │  (ChatClient)        │  │  search_profile         │
-            │  Complete / Stream    │  │  match_job_description  │
-            └──────────────────────┘  └────┬──────────────┬─────┘
-                                           │              │
-                              ┌────────────▼───┐  ┌──────▼────────┐
-                              │ OllamaEmbedder │  │ QdrantClient  │
-                              │  (Embedder)    │  │ (VectorStore) │
-                              └────────────────┘  └───────────────┘
+```mermaid
+flowchart TB
+    Client["Client<br/>(browser / curl / ragsume-ui frontend)"]
+    Server["cmd/server (chi router)<br/>middleware: RequestID, RealIP, Recoverer,<br/>CORS, RequestLogger<br/>routes: GET /health, POST /chat"]
+    Agent["agentkit.Agent<br/>tool-calling loop (max 5 iterations)<br/>Run() → non-streaming<br/>RunStream() → tool rounds then SSE stream"]
+    OpenRouter["OpenRouterClient (ChatClient)<br/>Complete / Stream"]
+    ToolExec["ToolExecutor<br/>search_profile<br/>match_job_description"]
+    Embedder["OllamaEmbedder (Embedder)"]
+    Qdrant["QdrantClient (VectorStore)"]
+
+    Client -->|"HTTP POST /chat (SSE)"| Server
+    Server --> Agent
+    Agent --> OpenRouter
+    Agent --> ToolExec
+    ToolExec --> Embedder
+    ToolExec --> Qdrant
 ```
 
 External dependencies:
@@ -108,6 +95,7 @@ External dependencies:
 | Qdrant    | Vector store (REST, port 6333)| `http://localhost:6333`    |
 | Ollama    | Local embedding model         | `http://localhost:11434`   |
 | OpenRouter| LLM chat completions gateway | `https://openrouter.ai/...`|
+| Redis     | Rate limiter backing store   | `redis://localhost:6379/0` |
 
 ---
 
@@ -124,6 +112,7 @@ External dependencies:
 | Vector store     | Qdrant via REST API                                     |
 | Embeddings       | Ollama (`nomic-embed-text`, 768-dim)                    |
 | LLM              | OpenRouter (`openai/gpt-oss-120b:free` default)         |
+| Rate limiter     | Redis (`github.com/redis/go-redis/v9`)                  |
 | Testing          | Go `testing` package                                    |
 | Containerisation | Docker multi-stage build (Debian slim runtime)          |
 
@@ -133,60 +122,27 @@ External dependencies:
 
 ---
 
-## 5. Repository Layout
+## 5. Project Structure
 
-```
-ragsume-core/
-├── agentkit/                 # Core RAG + agent infrastructure
-│   ├── agent.go              # Agent tool-calling loop
-│   ├── agent_test.go         # Unit tests with mocks
-│   ├── doc.go                # Package doc comment
-│   ├── embed.go              # Ollama embedder (Embedder interface)
-│   ├── openrouter.go         # OpenRouter chat client (ChatClient interface)
-│   ├── qdrant.go             # Qdrant REST client (VectorStore interface)
-│   ├── tools.go              # ToolExecutor + tool definitions
-│   └── types.go              # Shared types: Message, Chunk, Filter, etc.
-├── cmd/server/               # HTTP server entrypoint
-│   ├── main.go               # Bootstrap: config, logger, agent, server
-│   ├── router.go             # chi router + middleware wiring
-│   ├── profile.go            # Load/render profile.yaml
-│   ├── prompt.go             # System prompt builder
-│   ├── handlers/
-│   │   ├── chat.go           # POST /chat SSE handler
-│   │   └── health.go         # GET /health handler
-│   └── middleware/
-│       ├── cors.go           # CORS (single allowed origin)
-│       └── logger.go         # Per-request structured logging
-├── config/                   # Configuration loading
-│   ├── config.go             # Config struct + Load()
-│   ├── defaults.go           # Default model/collection/vector size
-│   ├── env.go                # Typed env helpers (getString, getInt, ...)
-│   ├── config_test.go
-│   └── env_test.go
-├── data/
-│   ├── profile.yaml          # Candidate profile (name, skills, contact)
-│   └── projects/             # One YAML per project to index
-│       ├── gAuthCraft.yaml
-│       ├── guardflux.yaml
-│       ├── multipay.yaml
-│       ├── ragsume-core.yaml
-│       └── ragsume-ui.yaml
-├── ingest/                   # Standalone indexing CLI
-│   ├── main.go               # Reads data/projects/*.yaml, embeds, upserts
-│   └── project.go            # Project struct, chunking, point ID
-├── logger/                   # Structured logging wrapper over slog
-│   ├── logger.go
-│   └── logger_test.go
-├── .env.example              # Template environment file
-├── .gitignore
-├── .dockerignore
-├── Dockerfile                # Multi-stage build
-├── go.mod / go.sum
-├── LICENSE                   # MIT
-└── README.md
-```
+The project is organised as a standard Go monorepo. Below is a breakdown of every
+top-level directory and its contents.
 
----
+| Directory / File | Purpose |
+|---|---|
+| `agentkit/` | Core agent library — tool-calling loop, LLM client (OpenRouter), vector store client (Qdrant), embedding, and type definitions |
+| `cmd/server/` | HTTP API entry point — `chi` router, middleware (CORS, logger, rate limiter), handlers (`/health`, `/chat`) |
+| `config/` | Environment-driven configuration — loads `.env`, parses typed values, provides defaults |
+| `data/` | Static data files — `profile.yaml` (candidate profile), `projects/*.yaml` (project descriptions) |
+| `ingest/` | Indexing pipeline — reads YAML projects, chunks text, generates embeddings, stores in Qdrant |
+| `logger/` | Structured logging wrapper around `log/slog` — supports file output, JSON/text format, debug levels |
+| `go.mod` | Go module definition — declares module path `ragsume-core` and all dependencies |
+| `go.sum` | Dependency checksum file — auto-generated, ensures reproducible builds |
+| `Dockerfile` | Multi-stage Docker build — compiles binary, runs in Debian slim image |
+| `.env.example` | Example environment variables — documents every required config key |
+| `.gitignore` | Git ignore rules — excludes `logs/`, `.env`, `tmp/`, binary artifacts |
+| `LICENSE` | Project license file |
+| `README.md` | This file — full project documentation |
+
 
 ## 6. Configuration
 
@@ -202,6 +158,9 @@ optionally reads a `.env` file (via `godotenv`) and then reads typed values from
 | `PORT`               | yes      | int     | HTTP server port                                     |
 | `DEBUG`              | yes      | bool    | Enables source location in logs; sets log level=debug|
 | `RATE`               | yes      | float   | Generic rate value (currently unused beyond config)  |
+| `REDIS_URL`          | yes      | string  | Redis URL for rate limiter backing store             |
+| `RATE_LIMIT_MAX`     | yes      | int     | Max requests per IP per window                       |
+| `RATE_LIMIT_WINDOW`  | yes      | int     | Rate limit window in seconds                         |
 | `LOG_LEVEL`          | no       | string  | `debug`/`info`/`warn`/`error` (default `info`)       |
 | `LOG_FORMAT`          | no       | string  | `text` or `json` (default `text`)                    |
 | `LOG_FILE`           | no       | string  | File path for logs; empty = stderr                   |
@@ -210,6 +169,9 @@ optionally reads a `.env` file (via `godotenv`) and then reads typed values from
 | `OPENROUTER_API_KEY` | yes      | string  | OpenRouter API key                                   |
 | `OLLAMA_URL`         | yes      | string  | Ollama server URL (for embeddings)                   |
 | `ALLOWED_ORIGIN`     | yes      | string  | Single CORS origin allowed for the frontend         |
+| `REDIS_URL`          | yes      | string  | Redis URL for rate limiter backing store             |
+| `RATE_LIMIT_MAX`     | yes      | int     | Max requests per IP per window                       |
+| `RATE_LIMIT_WINDOW`  | yes      | int     | Rate limit window in seconds                         |
 
 ### 6.2 Defaults ([`config/defaults.go`](config/defaults.go:1))
 
@@ -245,6 +207,9 @@ QDRANT_API_KEY=
 OPENROUTER_API_KEY=sk-or-v1-your-key-here
 OLLAMA_URL=http://localhost:11434
 ALLOWED_ORIGIN=http://localhost:3000
+REDIS_URL=redis://localhost:6379/0
+RATE_LIMIT_MAX=60
+RATE_LIMIT_WINDOW=60
 ```
 
 ---
@@ -475,6 +440,7 @@ output, level filtering, component scoping, file logging, and level parsing.
 | `RealIP`                | chi                             | Resolves client IP from headers  |
 | `Recoverer`             | chi                             | Recovers from panics             |
 | `CORS`                  | [`middleware/cors.go`](cmd/server/middleware/cors.go:1) | Single-origin CORS |
+| `RateLimiter`           | [`middleware/ratelimit.go`](cmd/server/middleware/ratelimit.go:1) | Redis-backed per-IP rate limiter |
 | `RequestLogger`         | [`middleware/logger.go`](cmd/server/middleware/logger.go:1) | Per-request log   |
 
 Routes:
@@ -541,6 +507,11 @@ Behavior ([`ServeHTTP()`](cmd/server/handlers/chat.go:29)):
 - **RequestLogger** ([`middleware/logger.go`](cmd/server/middleware/logger.go:1))
   — wraps the response writer, then logs method, path, request ID, status, and
   latency in ms.
+- **RateLimiter** ([`middleware/ratelimit.go`](cmd/server/middleware/ratelimit.go:1))
+  — Redis-backed per-IP rate limiter using a fixed window. Configured via
+  `REDIS_URL`, `RATE_LIMIT_MAX`, and `RATE_LIMIT_WINDOW` env vars. Sets
+  `X-RateLimit-Limit` and `X-RateLimit-Remaining` headers on every response,
+  and returns `429 Too Many Requests` when the limit is exceeded.
 
 ---
 
@@ -608,55 +579,61 @@ projects include:
 
 ## 13. Request Lifecycle
 
-A typical `POST /chat` request:
+```mermaid
+sequenceDiagram
+    participant Client as Client (browser/curl)
+    participant Server as cmd/server (chi router)
+    participant Agent as agentkit.Agent
+    participant LLM as OpenRouter (LLM)
+    participant Tools as ToolExecutor
+    participant Qdrant as Qdrant (VectorStore)
 
-1. **Client** sends `{"message":"Tell me about your Go backend work"}`.
-2. **chi middleware** adds request ID, resolves IP, applies CORS, logs.
-3. **ChatHandler** validates the body, sets SSE headers.
-4. **Agent.RunStream** prepends the system prompt (with profile YAML).
-5. **Iteration 1**: OpenRouter returns a `tool_call` for `search_profile` with
-   `{"query":"go backend work","filter":{"must":[{"field":"tech_stack","match":"go"}]}}`.
-6. **ToolExecutor.searchProfile** embeds the query via Ollama, queries Qdrant
-   with the filter, returns matching chunks as JSON.
-7. The tool result is appended as a `tool`-role message.
-8. **Iteration 2**: OpenRouter returns no tool calls → the loop breaks.
-9. **Final stream**: OpenRouter streams the answer token by token; each token
-   is written as an SSE `event: token` and flushed.
-10. The agent appends a `SOURCES: ...` citation line (per the system prompt).
-11. **ChatHandler** writes `event: done` and the connection closes.
+    Client->>Server: POST /chat {"message":"Tell me about your Go backend work"}
+    Server->>Server: middleware: RequestID, RealIP, CORS, Logger
+    Server->>Agent: Agent.RunStream(system prompt + profile YAML)
+    Agent->>LLM: LLM.Complete(msgs, toolDefs)
+    LLM-->>Agent: tool_call: search_profile
+    Agent->>Tools: Execute search_profile(query="go backend work")
+    Tools->>Qdrant: Embed query via Ollama + Query with filter
+    Qdrant-->>Tools: matching chunks as JSON
+    Tools-->>Agent: tool result (chunks)
+    Agent->>LLM: LLM.Complete(msgs + tool result)
+    LLM-->>Agent: no more tool calls
+    Agent->>LLM: LLM.CompleteStream(onToken)
+    LLM-->>Agent: streamed tokens
+    Agent-->>Server: SSE event: token (flushed)
+    Agent-->>Server: SOURCES: ... citation line
+    Server-->>Client: event: token (SSE)
+    Server-->>Client: event: done
+```
 
 ---
 
 ## 14. Agent Tool Loop
 
-```
-            ┌─────────────────────────────────────┐
-            │ baseMessages: [system, ...history,  │
-            │                user]                 │
-            └──────────────────┬──────────────────┘
-                               │
-                  ┌────────────▼────────────┐
-                  │  for i < MaxIter (5):    │
-                  │    LLM.Complete(msgs,    │
-                  │                 toolDefs)│
-                  └────────────┬────────────┘
-                               │
-              ┌────────────────┼────────────────┐
-              │                │                │
-      no tool calls      has tool calls    i >= MaxIter
-              │                │                │
-              ▼                ▼                ▼
-        return result   append assistant    error: exceeded
-        (Run)            + tool results
-                         loop again
-                               │
-                  (RunStream only, after break)
-                               │
-                               ▼
-                  LLM.CompleteStream(onToken)
-                               │
-                               ▼
-                        return streamed result
+```mermaid
+flowchart TD
+    Base["baseMessages:<br/>[system, ...history, user]"]
+    Loop["for i < MaxIter (5):<br/>LLM.Complete(msgs, toolDefs)"]
+    NoTools["no tool calls"]
+    HasTools["has tool calls"]
+    Exceeded["i >= MaxIter"]
+    Return["return result (Run)"]
+    Append["append assistant + tool results<br/>loop again"]
+    Error["error: exceeded"]
+    Stream["LLM.CompleteStream(onToken)"]
+    Result["return streamed result"]
+
+    Base --> Loop
+    Loop --> NoTools
+    Loop --> HasTools
+    Loop --> Exceeded
+    NoTools --> Return
+    HasTools --> Append
+    Append --> Loop
+    Exceeded --> Error
+    Return --> Stream
+    Stream --> Result
 ```
 
 ---
@@ -729,7 +706,7 @@ go run ./ingest            # index projects into Qdrant
 go run ./cmd/server        # start on :8080
 ```
 
-Prerequisites: a running Qdrant instance and Ollama server.
+Prerequisites: a running Qdrant instance, Ollama server, and Redis server.
 
 ### 16.2 Docker
 
@@ -743,13 +720,18 @@ The [`Dockerfile`](Dockerfile:1) is a multi-stage build:
 
 ```bash
 docker build -t ragsume-core .
-docker run -p 8080:8080 --env-file .env ragsume-core
+docker run -p 8080:8080 --env-file .env \
+  -e REDIS_URL=redis://host.docker.internal:6379/0 \
+  ragsume-core
 ```
 
 To ingest inside the container:
 ```bash
 docker exec <container> /app/ingest
 ```
+
+> **Note**: Redis must be accessible to the container. If running locally, use
+> `host.docker.internal` or a Docker Compose network.
 
 ---
 
@@ -787,6 +769,12 @@ Uses mocks implementing all three interfaces (`mockVectorStore`,
 - Text/JSON handler output, level filtering, component scoping, file logging
   (with nested dir creation), and `parseLevel` mapping.
 
+### 17.4 `middleware` Tests
+
+- **RateLimiter** ([`cmd/server/middleware/ratelimit_test.go`](cmd/server/middleware/ratelimit_test.go:1))
+  — tests `NewRateLimiter` creation, `Limit` handler behavior (sets headers,
+  calls next handler), and `clientIP` extraction from `RemoteAddr`.
+
 ---
 
 ## 18. Security Considerations
@@ -803,6 +791,9 @@ Uses mocks implementing all three interfaces (`mockVectorStore`,
 - **No auth on `/chat`**: the API has no authentication layer; in production,
   place it behind a reverse proxy with auth or rate limiting. The `RATE`
   config value is currently parsed but not enforced.
+- **Rate limiting**: the built-in [`RateLimiter`](cmd/server/middleware/ratelimit.go:1)
+  middleware enforces per-IP limits via Redis (`RATE_LIMIT_MAX`, `RATE_LIMIT_WINDOW`).
+  In production, ensure Redis is running and configured.
 
 ---
 
@@ -856,6 +847,8 @@ Uses mocks implementing all three interfaces (`mockVectorStore`,
 |                 | embeddings).                                                  |
 | Scroll          | Qdrant metadata-only listing via filter (no vector needed).  |
 | Query           | Qdrant nearest-neighbor search against a query vector.        |
+| Redis           | In-memory data store used as the rate limiter backing store.   |
+| Rate limiter    | Middleware that limits requests per IP using a fixed window.   |
 
 ---
 
