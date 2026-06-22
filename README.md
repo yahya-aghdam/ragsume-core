@@ -5,7 +5,7 @@
 > representative; the agent grounds every answer in indexed project chunks and a
 > profile, never inventing experience.
 >
-> **LLM model**: `openai/gpt-oss-120b:free` (via OpenRouter)
+> **LLM model**: `google/gemini-2.5-flash` (via OpenRouter)
 > **Embedding model**: `nomic-embed-text` (via Ollama, 768-dim)
 
 ---
@@ -111,7 +111,7 @@ External dependencies:
 | Logging          | Go stdlib `log/slog` (structured)                       |
 | Vector store     | Qdrant via REST API                                     |
 | Embeddings       | Ollama (`nomic-embed-text`, 768-dim)                    |
-| LLM              | OpenRouter (`openai/gpt-oss-120b:free` default)         |
+| LLM              | OpenRouter (`google/gemini-2.5-flash` default)         |
 | Rate limiter     | Redis (`github.com/redis/go-redis/v9`)                  |
 | Testing          | Go `testing` package                                    |
 | Containerisation | Docker multi-stage build (Debian slim runtime)          |
@@ -179,7 +179,7 @@ optionally reads a `.env` file (via `godotenv`) and then reads typed values from
 DefaultCollectionName = "projects"
 DefaultEmbedModel     = "nomic-embed-text"
 DefaultVectorSize     = 768
-DefaultLLMModel       = "openai/gpt-oss-120b:free"
+DefaultLLMModel       = "google/gemini-2.5-flash"
 ```
 
 ### 6.3 Loading Order
@@ -273,7 +273,7 @@ type VectorStore interface {
 `https://openrouter.ai/api/v1/chat/completions`.
 
 - [`NewOpenRouterClient()`](agentkit/openrouter.go:83) defaults the model to
-  `openai/gpt-oss-120b:free` and sets a 120s HTTP timeout.
+  `google/gemini-2.5-flash` and sets a 120s HTTP timeout.
 - [`Complete()`](agentkit/openrouter.go:97) — non-streaming completion; returns
   the first choice's message (which may contain `tool_calls`).
 - [`CompleteStream()`](agentkit/openrouter.go:134) — SSE streaming; parses

@@ -11,8 +11,8 @@ import (
 func TestNewOpenRouterClient(t *testing.T) {
 	t.Run("defaults model when empty", func(t *testing.T) {
 		c := NewOpenRouterClient("test-key", "")
-		if c.Model != "openai/gpt-oss-120b:free" {
-			t.Fatalf("got model %q, want openai/gpt-oss-120b:free", c.Model)
+		if c.Model != "google/gemini-2.5-flash" {
+			t.Fatalf("got model %q, want google/gemini-2.5-flash", c.Model)
 		}
 	})
 

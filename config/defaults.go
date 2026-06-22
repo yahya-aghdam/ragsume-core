@@ -4,5 +4,5 @@ const (
 	DefaultCollectionName = "projects"
 	DefaultEmbedModel     = "nomic-embed-text"
 	DefaultVectorSize     = 768
-	DefaultLLMModel       = "openai/gpt-oss-120b:free"
+	DefaultLLMModel       = "google/gemini-2.5-flash"
 )

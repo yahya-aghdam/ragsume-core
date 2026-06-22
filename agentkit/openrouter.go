@@ -82,7 +82,7 @@ type OpenRouterClient struct {
 // NewOpenRouterClient creates a client with defaults.
 func NewOpenRouterClient(apiKey, model string) *OpenRouterClient {
 	if model == "" {
-		model = "openai/gpt-oss-120b:free"
+		model = "google/gemini-2.5-flash"
 	}
 	return &OpenRouterClient{
 		APIKey:  apiKey,

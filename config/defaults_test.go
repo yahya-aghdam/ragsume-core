@@ -24,8 +24,8 @@ func TestDefaultConstants(t *testing.T) {
 	})
 
 	t.Run("DefaultLLMModel", func(t *testing.T) {
-		if DefaultLLMModel != "openai/gpt-oss-120b:free" {
-			t.Fatalf("got %q, want openai/gpt-oss-120b:free", DefaultLLMModel)
+		if DefaultLLMModel != "google/gemini-2.5-flash" {
+			t.Fatalf("got %q, want google/gemini-2.5-flash", DefaultLLMModel)
 		}
 	})
 }
