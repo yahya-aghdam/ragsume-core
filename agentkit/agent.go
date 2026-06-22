@@ -42,6 +42,10 @@ func (a *Agent) baseMessages(userMessages []Message) []Message {
 
 // Run executes the tool loop and returns the final assistant message.
 func (a *Agent) Run(ctx context.Context, userMessages []Message) (*RunResult, error) {
+	if a.LLM == nil {
+		return nil, fmt.Errorf("agent: LLM client is nil")
+	}
+
 	messages := a.baseMessages(userMessages)
 
 	for i := 0; i < a.maxIter(); i++ {
@@ -81,6 +85,10 @@ func (a *Agent) Run(ctx context.Context, userMessages []Message) (*RunResult, er
 
 // RunStream executes tool rounds without streaming, then streams the final answer.
 func (a *Agent) RunStream(ctx context.Context, userMessages []Message, onToken func(string) error) (*RunResult, error) {
+	if a.LLM == nil {
+		return nil, fmt.Errorf("agent: LLM client is nil")
+	}
+
 	messages := a.baseMessages(userMessages)
 	readyToStream := false
 

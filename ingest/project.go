@@ -57,6 +57,9 @@ func chunkProject(p Project) []projectChunk {
 }
 
 func normalizeTechStack(items []string) []string {
+	if items == nil {
+		return nil
+	}
 	out := make([]string, 0, len(items))
 	for _, item := range items {
 		v := strings.ToLower(strings.TrimSpace(item))

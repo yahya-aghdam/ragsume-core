@@ -23,6 +23,7 @@ type Config struct {
 	QdrantAPIKey     string
 	OpenRouterAPIKey string
 	OllamaURL        string
+	LLMModel         string
 	AllowedOrigin    string
 	RedisURL         string
 	RateLimitMax     int
@@ -100,6 +101,11 @@ func Load() error {
 		return err
 	}
 
+	llmModel := DefaultLLMModel
+	if value, ok := getOptionalString("LLM_MODEL"); ok {
+		llmModel = value
+	}
+
 	allowedOrigin, err := getString("ALLOWED_ORIGIN")
 	if err != nil {
 		return err
@@ -144,6 +150,7 @@ func Load() error {
 		QdrantAPIKey:     qdrantAPIKey,
 		OpenRouterAPIKey: openRouterAPIKey,
 		OllamaURL:        ollamaURL,
+		LLMModel:         llmModel,
 		AllowedOrigin:    allowedOrigin,
 		RedisURL:         redisURL,
 		RateLimitMax:     rateLimitMax,

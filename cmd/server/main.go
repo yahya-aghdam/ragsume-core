@@ -53,7 +53,7 @@ func main() {
 	logger.Info("connected to qdrant", "url", config.C.QdrantURL)
 
 	embedder := agentkit.NewOllamaEmbedder(config.C.OllamaURL, config.DefaultEmbedModel)
-	llm := agentkit.NewOpenRouterClient(config.C.OpenRouterAPIKey, config.DefaultLLMModel)
+	llm := agentkit.NewOpenRouterClient(config.C.OpenRouterAPIKey, config.C.LLMModel)
 	tools := agentkit.NewToolExecutor(qdrantClient, embedder, llm, config.DefaultCollectionName)
 	agent := agentkit.NewAgent(llm, *tools, BuildSystemPrompt(profileYAML))
 

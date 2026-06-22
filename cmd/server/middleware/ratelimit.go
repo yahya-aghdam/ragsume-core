@@ -53,6 +53,10 @@ func (rl *RateLimiter) Limit(next http.Handler) http.Handler {
 }
 
 func (rl *RateLimiter) allow(ctx context.Context, ip string) (allowed bool, remaining int, retryAfter int, err error) {
+	if rl.client == nil {
+		return false, 0, 0, fmt.Errorf("rate limiter: Redis client is nil")
+	}
+
 	windowStart := time.Now().Unix() / int64(rl.window.Seconds())
 	key := fmt.Sprintf("ratelimit:%s:%d", ip, windowStart)
 

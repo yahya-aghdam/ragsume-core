@@ -4,9 +4,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"ragsume-core/config"
 )
 
 func TestCORS(t *testing.T) {
+	// Set up the global config so CORS middleware has an origin to use.
+	config.C.AllowedOrigin = "http://localhost:3000"
+
 	t.Run("sets CORS headers", func(t *testing.T) {
 		handler := CORS(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
